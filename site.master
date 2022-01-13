@@ -1,0 +1,40 @@
+﻿<%@ Master Language="VB" CodeFile="site.master.vb" Inherits="site" %>
+
+<!DOCTYPE html>
+
+<html>
+<head runat="server">
+    <title></title>
+    <asp:ContentPlaceHolder id="head" runat="server">
+    </asp:ContentPlaceHolder>
+    <link href="css/bootstrap.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+</head>
+<body>
+    <form id="form1" runat="server">
+         
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+          <div class="container-fluid rtl">
+            <a class="navbar-brand" href="#">dotnet web form generator</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarColor01" aria-controls="navbarColor01" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarColor01">
+              <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                  <a class="nav-link" href="/genreate">generate page</a>
+                </li>
+               
+              </ul>
+            </div>
+          </div>
+        </nav>
+    <div class="container">
+        <asp:ContentPlaceHolder id="ContentPlaceHolder1" runat="server">
+        
+        </asp:ContentPlaceHolder>
+    </div>
+    </form>
+</body>
+</html>
