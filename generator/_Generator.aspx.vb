@@ -63,7 +63,7 @@ Partial Class Admin_Generator_Generator
         RV += "<asp:Content ID=""Content1"" ContentPlaceHolderID=""head"" runat=""Server""></asp:Content>" + vbCrLf
         RV += "<asp:Content ID=""Content2"" ContentPlaceHolderID=""ContentPlaceHolder1"" runat=""Server"">" + vbCrLf
 
-        RV += "    <div class='rtl'>" + vbCrLf
+        RV += "    <div class='rtl text-right'>" + vbCrLf
         'RV += "    <div class=""card text-center iran header-title"">" + vbCrLf
         RV += "        <br><h4>" + TextBox_PageTitle.Text + "</h4>" + vbCrLf
         'RV += "    </div>" + vbCrLf
@@ -106,7 +106,8 @@ Partial Class Admin_Generator_Generator
         RV += "     </Columns>" + vbCrLf
         RV += "        <PagerStyle CssClass=""app-pager"" />" + vbCrLf
         RV += "        <SelectedRowStyle CssClass=""table-selected"" />" + vbCrLf
-        RV += " </asp:GridView>" + vbCrLf
+        RV += "     </asp:GridView>" + vbCrLf
+        RV += " </div>" + vbCrLf
         RV += "</asp:Panel>" + vbCrLf
 
 
