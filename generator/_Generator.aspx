@@ -6,11 +6,11 @@
 <head runat="server">
     <link href="/css/bootstrap.css" rel="stylesheet" />
 
-    <title>ver 1.2.4</title>
+    <title>ver 1.2.6 / Dapper Version</title>
 </head>
 <body>
     <form id="form1" runat="server">
-        
+
 
         <div class="container-fluid">
             <div class="row">
@@ -104,7 +104,6 @@
         </div>
 
         <%--<asp:Button runat="server" ID="btn_test_vs" Text ="test view state" />--%>
-
     </form>
 
 </body>

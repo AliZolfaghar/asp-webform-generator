@@ -89,7 +89,7 @@ Partial Class Admin_Generator_Generator
         RV += "                </SelectParameters>" + vbCrLf
         RV += "            </asp:SqlDataSource>" + vbCrLf
 
-        RV += "    <asp:GridView CssClass=""table table-sm table-hover table-bordered table-striped az-table rtl"" ID=""GridView_List"" runat=""server"" AutoGenerateColumns=""False"" DataKeyNames=""" + TextBox_PrimaryKey.Text + """ DataSourceID=""SqlDataSource_List"" AllowPaging=""True"" AllowSorting=""True"" GridLines=""None"">" + vbCrLf
+        RV += "    <asp:GridView CssClass=""table table-sm table-hover table-bordered table-striped az-table rtl table-responsive"" ID=""GridView_List"" runat=""server"" AutoGenerateColumns=""False"" DataKeyNames=""" + TextBox_PrimaryKey.Text + """ DataSourceID=""SqlDataSource_List"" AllowPaging=""True"" AllowSorting=""True"" GridLines=""None"">" + vbCrLf
         RV += "        <Columns>" + vbCrLf
         RV += "            <asp:TemplateField HeaderText=""ردیف"" ItemStyle-CssClass=""text-center"" HeaderStyle-Width=""1%""><ItemTemplate><%# Container.DataItemIndex + 1 %></ItemTemplate></asp:TemplateField>" + vbCrLf
 
@@ -139,7 +139,9 @@ Partial Class Admin_Generator_Generator
                     Case "TextBox"
                         RV += "                                <asp:TextBox CssClass=""form-control"" ID=""TextBox_" + col + """ runat=""server""></asp:TextBox>" + vbCrLf
                     Case "TextArea"
-                        RV += "                                <asp:TextBox CssClass=""form-control"" ID=""TextBox_" + col + """ runat=""server"" TextMode=""MultiLine""></asp:TextBox>" + vbCrLf
+                        RV += "                                <asp:TextBox CssClass=""form-control""      ID=""TextBox_" + col + """ runat=""server"" TextMode=""MultiLine""></asp:TextBox>" + vbCrLf
+                    Case "BooleanCheckBox"
+                        RV += "                                <asp:CheckBox CssClass=""custom-checkbox"" ID=""CheckBox_" + col + """ runat=""server"" />"
                     Case Else
                         RV += "                                <asp:TextBox CssClass=""form-control"" ID=""TextBox_" + col + """ runat=""server""></asp:TextBox>" + vbCrLf
                 End Select
@@ -183,9 +185,14 @@ Partial Class Admin_Generator_Generator
         Return "SELECT * FROM (SELECT * , (SELECT * FROM " + DropDownList_TableName.SelectedValue + " WHERE " + TextBox_PrimaryKey.Text + "=SRCTBL." + TextBox_PrimaryKey.Text + " FOR JSON PATH ) AS SearchField FROM " + DropDownList_TableName.SelectedValue + " SRCTBL ) TBL Where SearchField like '%' + @SV + '%' "
     End Function
 
-    Function Generate_ASPXVB(Cols As List(Of String)) As String
+
+    '-> generate vb file top section 
+    Function Gen_StartClass(Cols As List(Of String)) As String
         Dim RV As String = ""
+
         RV += "Imports System.Drawing" + vbCrLf
+        RV += "Imports System.Data.SqlClient" + vbCrLf
+        RV += "Imports Dapper" + vbCrLf
         RV += "Partial Class Admin_Manage_" + TextBox_PageName.Text + vbCrLf
         RV += "    Inherits System.Web.UI.Page" + vbCrLf
 
@@ -247,8 +254,12 @@ Partial Class Admin_Generator_Generator
             If col.ToUpper = TextBox_PrimaryKey.Text.ToUpper Then
 
             Else
-                RV += "        TextBox_" + col + ".Text = """"" + vbCrLf
-
+                Select Case Request.Form("InputType_" + col)
+                    Case "BooleanCheckBox"
+                        RV += "        CheckBox_" + col + ".Checked = False" + vbCrLf
+                    Case Else
+                        RV += "        TextBox_" + col + ".Text = """"" + vbCrLf
+                End Select
             End If
         Next
         RV += "    End Sub" + vbCrLf
@@ -272,19 +283,26 @@ Partial Class Admin_Generator_Generator
             If col.ToUpper = TextBox_PrimaryKey.Text.ToUpper Then
 
             Else
-                RV += "        If TextBox_" + col + ".Text = """" Then" + vbCrLf
-                RV += "            'RV = False" + vbCrLf
-                RV += "            Label_Message.Text = ""لطفا " + Request.Form("PersianName_" + col) + " را وارد کنید.""" + vbCrLf
-                RV += "            TextBox_" + col + ".Focus()" + vbCrLf
-                RV += "            Return False" + vbCrLf
-                RV += "        End If" + vbCrLf
-                RV += "" + vbCrLf
+                Select Case Request.Form("InputType_" + col)
+                    Case "TextBox", "TextArea"
+                        RV += "        If TextBox_" + col + ".Text = """" Then" + vbCrLf
+                        RV += "            'RV = False" + vbCrLf
+                        RV += "            Label_Message.Text = ""لطفا " + Request.Form("PersianName_" + col) + " را وارد کنید.""" + vbCrLf
+                        RV += "            TextBox_" + col + ".Focus()" + vbCrLf
+                        RV += "            Return False" + vbCrLf
+                        RV += "        End If" + vbCrLf
+                        RV += "" + vbCrLf
+                End Select
             End If
         Next
         RV += "        Return RV" + vbCrLf
         RV += "    End Function" + vbCrLf
+        Return RV
+    End Function
 
-        '-> save new action 
+    '-> generate save_new function 
+    Function Gen_SaveNew(Cols As List(Of String)) As String
+        Dim RV As String = ""
         RV += "    Sub Save_New()" + vbCrLf
         RV += "        If Validate_Inputs() Then" + vbCrLf
         RV += "            Dim SqlStr As String = ""INSERT INTO " + DropDownList_TableName.SelectedValue + " ("
@@ -308,29 +326,45 @@ Partial Class Admin_Generator_Generator
         RV = Left(RV, Len(RV) - 1)
         RV += ") """ + vbCrLf
 
-        RV += "            Dim DAL as New AZDBL " + vbCrLf
-        RV += "            DAL.SqlStr = SqlStr" + vbCrLf
-        RV += "            DAL.Params.Clear()" + vbCrLf
+        'RV += "            Dim DAL as New AZDBL " + vbCrLf
+        'RV += "            DAL.SqlStr = SqlStr" + vbCrLf
+        'RV += "            DAL.Params.Clear()" + vbCrLf
+
+        RV += "            Dim Params As Object = New With { "
 
         For Each col In Cols
             If Request.Form("InputType_" + col) = "Nothing" Or col.ToUpper = TextBox_PrimaryKey.Text.ToUpper Then
 
             Else
-                RV += "            DAL.Params.Add(""@" + col + """, TextBox_" + col + ".Text) " + vbCrLf
+                Select Case Request.Form("InputType_" + col)
+                    Case "BooleanCheckBox"
+                        'RV += "            DAL.Params.Add(""@" + col + """, CheckBox_" + col + ".Checked) " + vbCrLf
+                        RV += " ." + col + " = CheckBox_" + col + ".Checked ,"
+                    Case Else
+                        'RV += "            DAL.Params.Add(""@" + col + """, TextBox_" + col + ".Text) " + vbCrLf
+                        RV += " ." + col + " = TextBox_" + col + ".Text ,"
+                End Select
                 ' TextBox_" + col + ".Text
             End If
         Next
+        '-> remove last , 
+        RV = Left(RV, Len(RV) - 1)
+        RV += "}" + vbCrLf
+
         'RV += "            Dim DA As New DALTableAdapters." + DropDownList_TableName.SelectedValue + "TableAdapter" + vbCrLf
 
         RV += "            Try " + vbCrLf
-        RV += "                DAL.ExecuteNonQuery()" + vbCrLf
+        RV += "                Using oCnn As New SqlConnection(CnnStr) " + vbCrLf
+        RV += "                    oCnn.Execute(SqlStr, Params)" + vbCrLf
+        RV += "                End Using " + vbCrLf
+        'RV += "                DAL.ExecuteNonQuery()" + vbCrLf
         RV += "                Switch_To_List()" + vbCrLf
         RV += "                GridView_List.DataBind()" + vbCrLf
         RV += "                Label_ActionMessage.Text = ""اطلاعات با موفقیت ثبت شد.""" + vbCrLf
         RV += "            Catch ex As Exception" + vbCrLf
         RV += "                Label_Message.Text = ""ثبت اطلاعات در بانک اطلاعانی با اشکال مواجه شد!"" + ex.Message" + vbCrLf
         RV += "            End Try" + vbCrLf
-        RV += "            DAL.Dispose() " + vbCrLf
+        'RV += "            DAL.Dispose() " + vbCrLf
 
         ' RV += "            Try" + vbCrLf
         'RV += "                DA.Insert("
@@ -348,43 +382,67 @@ Partial Class Admin_Generator_Generator
         RV += "        End If" + vbCrLf
         RV += "    End Sub" + vbCrLf
 
-        '-> load data 
+
+        Return RV
+    End Function
+
+
+    '-> generate Load_Data Function 
+    Function Gen_LoadData(Cols As List(Of String)) As String
+        Dim RV As String = ""
+
         RV += "    Sub Load_Data(ID As Integer)" + vbCrLf
         RV += "        Dim SqlStr As String = ""SELECT * FROM " + DropDownList_TableName.SelectedValue + " WHERE " + TextBox_PrimaryKey.Text + "=@" + TextBox_PrimaryKey.Text + """ " + vbCrLf
-        RV += "        Dim DAL As New AZDBL" + vbCrLf
-        RV += "        DAL.SqlStr = SqlStr" + vbCrLf
-        RV += "        DAL.Params.Clear()" + vbCrLf
-        RV += "        DAL.Params.Add(""@" + TextBox_PrimaryKey.Text + """, ID)" + vbCrLf
+        'RV += "        Dim DAL As New AZDBL" + vbCrLf
+        'RV += "        DAL.SqlStr = SqlStr" + vbCrLf
+        'RV += "        DAL.Params.Clear()" + vbCrLf
+        'RV += "        DAL.Params.Add(""@" + TextBox_PrimaryKey.Text + """, ID)" + vbCrLf
+        RV += "        Dim Params As Object = New With { ." + TextBox_PrimaryKey.Text + " = ID }" + vbCrLf
 
-        RV += "        Dim DT As New System.Data.DataTable" + vbCrLf
+        'RV += "        Dim DT As New System.Data.DataTable" + vbCrLf
 
         RV += "        Try" + vbCrLf
-        RV += "            DT = DAL.ExecuteDatatable()" + vbCrLf
+        RV += "            Using oCnn As New SqlConnection(CnnStr) " + vbCrLf
+        RV += "                Dim Data = oCnn.QueryFirst(SqlStr, Params)" + vbCrLf
+        RV += "                Label_" + TextBox_PrimaryKey.Text + ".Text = Data." + TextBox_PrimaryKey.Text + vbCrLf
+        For Each col In Cols
+            If col.ToUpper = TextBox_PrimaryKey.Text.ToUpper Then
+
+            Else
+                Select Case Request.Form("InputType_" + col)
+                    Case "BooleanCheckBox"
+                        RV += "                CheckBox_" + col + ".Checked = Data." + col + vbCrLf
+                    Case Else
+                        RV += "                TextBox_" + col + ".Text = Data." + col + vbCrLf
+                End Select
+            End If
+        Next
+        RV += "            End Using " + vbCrLf
+        'RV += "            " + vbCrLf
+        'RV += "            DT = DAL.ExecuteDatatable()" + vbCrLf
         RV += "        Catch ex As Exception" + vbCrLf
-        RV += "            " + vbCrLf
+        RV += "            Label_Message.Text = ex.Message" + vbCrLf
         RV += "        End Try" + vbCrLf
-        RV += "        DAL.Dispose()" + vbCrLf
-        RV += "        " + vbCrLf
+        'RV += "        DAL.Dispose()" + vbCrLf
+        'RV += "        " + vbCrLf
 
         'RV += "        Dim DA As New DALTableAdapters." + DropDownList_TableName.SelectedValue + "TableAdapter" + vbCrLf
         'RV += "        Dim DT As New DAL." + DropDownList_TableName.SelectedValue + "DataTable" + vbCrLf
         'RV += "        DA.FillBy_ID(DT, ID)" + vbCrLf
         'RV += "        DA.Dispose()" + vbCrLf
         'RV += "        For Each row As DAL." + DropDownList_TableName.SelectedValue + "Row In DT.Rows" + vbCrLf
-        RV += "        For Each row As System.Data.DataRow In DT.Rows" + vbCrLf
-        RV += "            Label_" + TextBox_PrimaryKey.Text + ".Text = row.Item(""" + TextBox_PrimaryKey.Text + """)" + vbCrLf
-        For Each col In Cols
-            If col.ToUpper = TextBox_PrimaryKey.Text.ToUpper Then
-
-            Else
-                RV += "            TextBox_" + col + ".Text = row.Item(""" + col + """).ToString()" + vbCrLf
-            End If
-        Next
-        RV += "        Next" + vbCrLf
-        RV += "        DT.Dispose()" + vbCrLf
+        'RV += "        For Each row As System.Data.DataRow In DT.Rows" + vbCrLf
+        'RV += "        Next" + vbCrLf
+        'RV += "        DT.Dispose()" + vbCrLf
         RV += "    End Sub" + vbCrLf
 
-        '-> save changes
+
+        Return RV
+    End Function
+
+    '-> generate Save_Changes Function 
+    Function Gen_SaveChanges(Cols As List(Of String)) As String
+        Dim RV As String = ""
         RV += "    Sub Save_Changes()" + vbCrLf
         RV += "        If Validate_Inputs() Then" + vbCrLf
         RV += "            Dim SqlStr As String = ""UPDATE " + DropDownList_TableName.SelectedValue + " SET "
@@ -398,31 +456,42 @@ Partial Class Admin_Generator_Generator
         RV = Left(RV, Len(RV) - 1)
 
         RV += "WHERE " + TextBox_PrimaryKey.Text + "=@" + TextBox_PrimaryKey.Text + " """ + vbCrLf
-        RV += "            Dim DAL As New AZDBL" + vbCrLf
-        RV += "            DAL.SqlStr = SqlStr" + vbCrLf
-        RV += "            DAL.Params.Clear()" + vbCrLf
 
-        RV += "            DAL.Params.Add(""@" + TextBox_PrimaryKey.Text + """, Label_" + TextBox_PrimaryKey.Text + ".Text" + ")" + vbCrLf
+        'RV += "            Dim DAL As New AZDBL" + vbCrLf
+        'RV += "            DAL.SqlStr = SqlStr" + vbCrLf
+        'RV += "            DAL.Params.Clear()" + vbCrLf
+        RV += "            Dim Params As Object = New With { "
+        RV += "." + TextBox_PrimaryKey.Text + " = Label_" + TextBox_PrimaryKey.Text + ".Text" + " ,"
 
         For Each col In Cols
             If Request.Form("InputType_" + col) = "Nothing" Or col.ToUpper = TextBox_PrimaryKey.Text.ToUpper Then
 
             Else
-                RV += "            DAL.Params.Add(""@" + col + """, TextBox_" + col + ".Text)" + vbCrLf
+                Select Case Request.Form("InputType_" + col)
+                    Case "BooleanCheckBox"
+                        RV += " ." + col + " = CheckBox_" + col + ".Checked ,"
+                    Case Else
+                        RV += " ." + col + " = TextBox_" + col + ".Text ,"
+                End Select
             End If
         Next
+        RV = Left(RV, Len(RV) - 1)
+        RV += "             }" + vbCrLf
 
         RV += "            Try" + vbCrLf
-        RV += "                DAL.ExecuteNonQuery()" + vbCrLf
+        RV += "                Using oCnn As New SqlConnection(CnnStr)" + vbCrLf
+        RV += "                    oCnn.Execute(SqlStr, Params)" + vbCrLf
+        RV += "                End Using" + vbCrLf
+        'RV += "                DAL.ExecuteNonQuery()" + vbCrLf
         RV += "                Switch_To_List()" + vbCrLf
         RV += "                GridView_List.DataBind()" + vbCrLf
         RV += "                Label_ActionMessage.Text = ""اطلاعات با موفقیت به روز رسانی شد.""" + vbCrLf
         RV += "            Catch ex As Exception" + vbCrLf
         RV += "                Label_Message.Text = ""ثبت تغییرات در بانک اطلاعانی با اشکال مواجه شد!"" + ex.Message" + vbCrLf
-        RV += "                " + vbCrLf
+        'RV += "                " + vbCrLf
         RV += "            End Try" + vbCrLf
-        RV += "            DAL.Dispose()" + vbCrLf
-        RV += "            " + vbCrLf
+        'RV += "            DAL.Dispose()" + vbCrLf
+        'RV += "            " + vbCrLf
 
         'RV += "            Dim DA As New DALTableAdapters." + DropDownList_TableName.SelectedValue + "TableAdapter" + vbCrLf
         'RV += "            Try" + vbCrLf
@@ -434,26 +503,60 @@ Partial Class Admin_Generator_Generator
         RV += "        End If" + vbCrLf
         RV += "    End Sub" + vbCrLf
 
-        '-> delete data 
+        Return RV
+    End Function
+
+    '-> generate Delete_Data function 
+    Function Gen_DeleteData(Cols As List(Of String)) As String
+        Dim RV As String = ""
         RV += "    Sub Delete_Data()" + vbCrLf
         RV += "        Dim SqlStr As String = ""DELETE FROM " + DropDownList_TableName.SelectedValue + " WHERE " + TextBox_PrimaryKey.Text + "=@" + TextBox_PrimaryKey.Text + """ " + vbCrLf
-        RV += "        " + vbCrLf
-        RV += "        Dim DAL As New AZDBL" + vbCrLf
-        RV += "        DAL.SqlStr = SqlStr" + vbCrLf
-        RV += "        DAL.Params.Clear()" + vbCrLf
-        RV += "        DAL.Params.Add(""@" + TextBox_PrimaryKey.Text + """, Label_" + TextBox_PrimaryKey.Text + ".Text)" + vbCrLf
+        'RV += "        " + vbCrLf
+        'RV += "        Dim DAL As New AZDBL" + vbCrLf
+        'RV += "        DAL.SqlStr = SqlStr" + vbCrLf
+        'RV += "        DAL.Params.Clear()" + vbCrLf
+        RV += "        Dim Params As Object = New With { ." + TextBox_PrimaryKey.Text + " = Label_" + TextBox_PrimaryKey.Text + ".Text }" + vbCrLf
         RV += "        Try" + vbCrLf
-        RV += "            DAL.ExecuteNonQuery()" + vbCrLf
+        RV += "            Using oCnn As New SqlConnection(CnnStr)" + vbCrLf
+        RV += "                oCnn.Execute(SqlStr, Params)" + vbCrLf
+        RV += "            End Using" + vbCrLf
+        'RV += "            DAL.ExecuteNonQuery()" + vbCrLf
         RV += "            Switch_To_List()" + vbCrLf
         RV += "            GridView_List.DataBind()" + vbCrLf
         RV += "            Label_ActionMessage.Text = ""اطلاعات با موفقیت حذف شد.""" + vbCrLf
         RV += "        Catch ex As Exception" + vbCrLf
         RV += "            Label_Message.Text = ""حذف اطلاعات از بانک اطلاعانی با اشکال مواجه شد!"" + ex.Message" + vbCrLf
         RV += "        End Try" + vbCrLf
-        RV += "        DAL.Dispose()" + vbCrLf
+        'RV += "        DAL.Dispose()" + vbCrLf
         RV += "    End Sub" + vbCrLf
 
-        RV += "End Class" + vbCrLf
+
+
+        Return RV
+    End Function
+
+    Function Gen_EndClass() As String
+        Return "End Class" + vbCrLf
+    End Function
+    Function Generate_ASPXVB(Cols As List(Of String)) As String
+
+        Dim RV As String = ""
+
+        RV += Gen_StartClass(Cols)
+
+        '-> save new action 
+        RV += Gen_SaveNew(Cols)
+
+        '-> load data 
+        RV += Gen_LoadData(Cols)
+
+        '-> save changes
+        RV += Gen_SaveChanges(Cols)
+
+        '-> delete data
+        RV += Gen_DeleteData(Cols)
+
+        RV += Gen_EndClass()
 
         Return RV
     End Function
